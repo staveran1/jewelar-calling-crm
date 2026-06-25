@@ -1,0 +1,1421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Jewelar — Wholesale Calling CRM</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.2.0",
+    "react-dom": "https://esm.sh/react-dom@18.2.0?external=react",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client?external=react",
+    "lucide-react": "https://esm.sh/lucide-react@0.383.0?external=react"
+  }
+}
+</script>
+<script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js"></script>
+<style>
+  html, body, #root { height: 100%; }
+  body { margin: 0; background: #FAF8F4; }
+  #boot { height:100%; display:flex; align-items:center; justify-content:center; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; color:#8C887E; }
+  .boot-dot { width:10px; height:10px; border-radius:50%; background:#A9823B; animation:pulse 1s infinite ease-in-out; }
+  @keyframes pulse { 0%,100%{opacity:.3;transform:scale(.8)} 50%{opacity:1;transform:scale(1)} }
+</style>
+</head>
+<body>
+<div id="root"><div id="boot"><div style="display:flex;gap:8px;align-items:center"><span class="boot-dot"></span> Loading your CRM…</div></div></div>
+<script>
+  // Safety net: if the app hasn't mounted after 9s, tell the user instead of a blank screen.
+  setTimeout(function () {
+    var boot = document.getElementById("boot");
+    if (boot) {
+      boot.innerHTML =
+        '<div style="text-align:center;max-width:360px;padding:24px;line-height:1.6">' +
+        'The dashboard is taking longer than expected.<br>' +
+        'Please check your internet connection and refresh the page.</div>';
+    }
+  }, 9000);
+</script>
+<script type="text/babel" data-type="module" data-presets="react">
+import React, { useState, useMemo, useEffect, useRef } from "react";
+import { createRoot } from "react-dom/client";
+import {
+  LayoutDashboard, Phone, PhoneCall, PhoneOff, PhoneForwarded, Voicemail,
+  Users, MapPin, FileText, Calendar, Shield, BarChart3, Settings, Search,
+  Plus, X, Check, CheckCircle2, XCircle, ChevronRight, Star, Clock, Mic,
+  Send, Pencil, Copy, RotateCcw, Building2, AlertTriangle, User, ArrowRight,
+  Bell, Globe, ExternalLink, Save, History, ThumbsUp, ThumbsDown, Tag,
+  DollarSign, TrendingUp, Activity, PhoneIncoming, Headphones, Play, Square,
+  Mail, MessageSquare, Menu, Filter, CalendarClock, ShieldCheck, CircleDot,
+} from "lucide-react";
+
+/* ============================================================
+   THEME — ink + brass, a restrained jewelry-wholesale palette
+   ============================================================ */
+const C = {
+  ink: "#17161D",
+  ink2: "#1F1E27",
+  inkSoft: "#2A2932",
+  gold: "#A9823B",
+  goldSoft: "#F4EBD7",
+  goldLine: "#E4D4AC",
+  bg: "#FAF8F4",
+  card: "#FFFFFF",
+  line: "#EAE5DB",
+  text: "#22212A",
+  muted: "#8C887E",
+  faint: "#B7B2A8",
+  green: "#1F8F62", greenBg: "#E6F3EC",
+  red: "#C04039", redBg: "#FAE9E7",
+  amber: "#C0792A", amberBg: "#F8EEDD",
+  blue: "#2E6CA6", blueBg: "#E7F0F8",
+  slate: "#6B7280", slateBg: "#EFEFEC",
+};
+
+const FONT = `'Fraunces', Georgia, 'Times New Roman', serif`;
+const SANS = `'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
+
+/* Status -> color mapping (used by badges everywhere) */
+const STATUS_TONE = {
+  "Interested": "green", "Wants catalog": "green", "Requested price list": "green",
+  "Requested email": "green", "Closed won": "green",
+  "Answered": "blue", "Connected": "blue", "Completed": "blue",
+  "Wants callback": "amber", "Follow-up": "amber", "Waiting for reply": "amber",
+  "Call again": "amber", "Send catalog": "amber", "Send price list": "amber",
+  "No answer": "slate", "Busy": "slate", "Voicemail": "slate", "New": "slate",
+  "Ready": "slate",
+  "Not interested": "red", "Do not call": "red", "Wrong number": "red",
+  "Call failed": "red", "Failed": "red", "Closed lost": "red",
+};
+const toneStyle = (tone) => {
+  const map = {
+    green: { bg: C.greenBg, fg: C.green }, red: { bg: C.redBg, fg: C.red },
+    amber: { bg: C.amberBg, fg: C.amber }, blue: { bg: C.blueBg, fg: C.blue },
+    slate: { bg: C.slateBg, fg: C.slate },
+  };
+  return map[tone] || map.slate;
+};
+
+/* ============================================================
+   MOCK DATA
+   ============================================================ */
+const SOURCES = ["Google Maps", "Referral", "Trade show", "Instagram", "Website"];
+
+const MOCK_LEADS = [
+  { id: 1, name: "Coastal Charm Boutique", phone: "(305) 555-0142", email: "hello@coastalcharm.co", website: "coastalcharm.co", address: "128 Lincoln Rd, Miami Beach, FL 33139", rating: 4.7, source: "Google Maps", status: "Interested", lastCall: "2026-06-22", nextFollowUp: "2026-06-26", score: 86, dnc: false, catalog: "Sent", notes: "Owner Maria liked the gold-plated hoops. Wants the full line sheet." },
+  { id: 2, name: "Verdigris Fine Accessories", phone: "(786) 555-0199", email: "buy@verdigris.shop", website: "verdigris.shop", address: "3417 Main Hwy, Coconut Grove, FL 33133", rating: 4.5, source: "Referral", status: "Wants catalog", lastCall: "2026-06-23", nextFollowUp: "2026-06-25", score: 78, dnc: false, catalog: "Requested", notes: "Asked for wholesale pricing on stacking rings." },
+  { id: 3, name: "Marlowe & Stone", phone: "(954) 555-0177", email: "", website: "marlowestone.com", address: "612 Las Olas Blvd, Fort Lauderdale, FL 33301", rating: 4.8, source: "Trade show", status: "Wants callback", lastCall: "2026-06-21", nextFollowUp: "2026-06-27", score: 71, dnc: false, catalog: "—", notes: "Call back after their summer buying meeting." },
+  { id: 4, name: "Halcyon Jewelers", phone: "(561) 555-0123", email: "info@halcyonjewelers.com", website: "halcyonjewelers.com", address: "240 Worth Ave, Palm Beach, FL 33480", rating: 4.9, source: "Google Maps", status: "Not interested", lastCall: "2026-06-20", nextFollowUp: "", score: 22, dnc: false, catalog: "—", notes: "Carries fine jewelry only, not fashion." },
+  { id: 5, name: "The Gilded Thread", phone: "(813) 555-0156", email: "shop@gildedthread.co", website: "gildedthread.co", address: "1701 W Swann Ave, Tampa, FL 33606", rating: 4.4, source: "Instagram", status: "New", lastCall: "", nextFollowUp: "", score: 64, dnc: false, catalog: "—", notes: "" },
+  { id: 6, name: "Saltwater & Sage", phone: "(727) 555-0188", email: "orders@saltwatersage.com", website: "saltwatersage.com", address: "455 Central Ave, St. Petersburg, FL 33701", rating: 4.6, source: "Google Maps", status: "Answered", lastCall: "2026-06-24", nextFollowUp: "2026-06-28", score: 69, dnc: false, catalog: "—", notes: "Spoke with the buyer, sending intro email." },
+  { id: 7, name: "Lumen Boutique", phone: "(305) 555-0111", email: "", website: "lumenboutique.co", address: "9 NE 41st St, Miami, FL 33137", rating: 4.3, source: "Website", status: "No answer", lastCall: "2026-06-24", nextFollowUp: "2026-06-25", score: 51, dnc: false, catalog: "—", notes: "" },
+  { id: 8, name: "Atelier Bisou", phone: "(786) 555-0164", email: "bonjour@atelierbisou.com", website: "atelierbisou.com", address: "140 NE 39th St, Miami, FL 33137", rating: 4.7, source: "Referral", status: "Do not call", lastCall: "2026-06-19", nextFollowUp: "", score: 8, dnc: true, catalog: "—", notes: "Requested removal from calling list." },
+  { id: 9, name: "Juniper Lane", phone: "(407) 555-0133", email: "hi@juniperlane.shop", website: "juniperlane.shop", address: "20 S Magnolia Ave, Orlando, FL 32801", rating: 4.5, source: "Google Maps", status: "Wants catalog", lastCall: "2026-06-23", nextFollowUp: "2026-06-26", score: 74, dnc: false, catalog: "Requested", notes: "Interested in starter pack for boutiques." },
+  { id: 10, name: "Bramble & Co.", phone: "(239) 555-0102", email: "team@brambleco.com", website: "brambleco.com", address: "1300 Third St S, Naples, FL 34102", rating: 4.8, source: "Trade show", status: "Interested", lastCall: "2026-06-22", nextFollowUp: "2026-06-25", score: 90, dnc: false, catalog: "Sent", notes: "High intent. Ready to place a first order over $150." },
+  { id: 11, name: "Marigold Mercantile", phone: "(904) 555-0175", email: "", website: "marigoldmercantile.com", address: "207 N 2nd St, Jacksonville Beach, FL 32250", rating: 4.2, source: "Instagram", status: "Voicemail", lastCall: "2026-06-24", nextFollowUp: "2026-06-27", score: 47, dnc: false, catalog: "—", notes: "Left a voicemail, will retry midweek." },
+  { id: 12, name: "Opal & Oak", phone: "(561) 555-0149", email: "shop@opalandoak.co", website: "opalandoak.co", address: "512 Clematis St, West Palm Beach, FL 33401", rating: 4.6, source: "Google Maps", status: "New", lastCall: "", nextFollowUp: "", score: 60, dnc: false, catalog: "—", notes: "" },
+];
+
+const MOCK_CALLS = [
+  { id: 901, leadId: 1, store: "Coastal Charm Boutique", phone: "(305) 555-0142", datetime: "2026-06-22 10:14", duration: "4:32", outcome: "Interested", objections: "Wanted to confirm minimum order quantity", summary: "Owner is interested in gold-plated hoops and layered necklaces. Confirmed MOQ of 10 per style. Sending line sheet.", nextFollowUp: "2026-06-26", notes: "Warm. Decision maker reached.", mode: "AI" },
+  { id: 902, leadId: 2, store: "Verdigris Fine Accessories", phone: "(786) 555-0199", datetime: "2026-06-23 14:02", duration: "3:08", outcome: "Wants catalog", objections: "Pricing sensitivity on rings", summary: "Requested wholesale catalog and price list for stacking rings.", nextFollowUp: "2026-06-25", notes: "Send price list with margins highlighted.", mode: "AI" },
+  { id: 903, leadId: 7, store: "Lumen Boutique", phone: "(305) 555-0111", datetime: "2026-06-24 09:40", duration: "0:00", outcome: "No answer", objections: "—", summary: "No answer. No voicemail left.", nextFollowUp: "2026-06-25", notes: "Retry tomorrow morning.", mode: "AI" },
+  { id: 904, leadId: 10, store: "Bramble & Co.", phone: "(239) 555-0102", datetime: "2026-06-22 11:55", duration: "6:11", outcome: "Interested", objections: "Asked about shipping costs", summary: "High intent. Ready to place a first order. Free shipping over $150 closed the objection.", nextFollowUp: "2026-06-25", notes: "Priority follow-up.", mode: "Human" },
+  { id: 905, leadId: 4, store: "Halcyon Jewelers", phone: "(561) 555-0123", datetime: "2026-06-20 15:20", duration: "1:47", outcome: "Not interested", objections: "Fine jewelry only", summary: "Not a fit. Carries fine jewelry, not fashion/plated.", nextFollowUp: "", notes: "Do not pursue.", mode: "AI" },
+  { id: 906, leadId: 11, store: "Marigold Mercantile", phone: "(904) 555-0175", datetime: "2026-06-24 13:30", duration: "0:38", outcome: "Voicemail", objections: "—", summary: "Left voicemail introducing Jewelar wholesale.", nextFollowUp: "2026-06-27", notes: "", mode: "AI" },
+];
+
+const MOCK_TEST_CALLS = [
+  { id: 1, datetime: "2026-06-23 17:10", script: "Standard Wholesale Intro v3", voice: "Ava (warm)", scenario: "Practice the catalog offer and objection handling", rating: "Needs improvement", improve: "AI talked too fast on the pricing section. Slow down and pause after the MOQ line." },
+  { id: 2, datetime: "2026-06-24 08:25", script: "Standard Wholesale Intro v3", voice: "Ava (warm)", scenario: "Test the callback request flow", rating: "Good", improve: "Callback handling felt natural. Keep the closing line." },
+];
+
+const SCRIPT_FIELDS = [
+  ["opening", "Opening line", "Hi, this is Ava calling on behalf of Jewelar. Is this a good moment for a quick word with whoever handles buying?"],
+  ["intro", "Company intro", "Jewelar is a wholesale gold-plated fashion jewelry brand. We supply boutiques across the US with earrings, necklaces, rings, and bracelets at 3 to 4 times retail margins."],
+  ["offer", "Offer description", "We have a starter program built for boutiques: low minimums, mix-and-match styles, and free shipping on first orders over 150 dollars."],
+  ["qualify", "Qualification questions", "Do you currently carry fashion jewelry? Roughly how many accessory SKUs do you stock? Who handles your buying decisions?"],
+  ["objection", "Objection responses", "I understand price matters. Our wholesale starts at 1 dollar for earrings, which gives you 8 to 16 dollar retail. I can send a price sheet so you can see the margins for yourself."],
+  ["catalog", "Catalog offer line", "I'd love to send over our full line sheet with wholesale pricing. What is the best email for that?"],
+  ["callback", "Callback request line", "No problem at all. When would be a better time to reach you, and is this the best number?"],
+  ["closing", "Closing line", "Thank you for your time. I'll follow up by email, and we look forward to working with you."],
+  ["aiDisclosure", "AI disclosure line", "Quick note for transparency: I'm an AI assistant calling on behalf of Jewelar."],
+  ["recDisclosure", "Recording disclosure line", "This call may be recorded for quality and training purposes."],
+];
+
+const buildDefaultScript = () =>
+  SCRIPT_FIELDS.reduce((acc, [k, , v]) => ((acc[k] = v), acc), {});
+
+const MOCK_SCRIPT_VERSIONS = [
+  { v: 3, date: "2026-06-20", editedBy: "Stav", answer: "41%", interest: "27%", note: "Current" },
+  { v: 2, date: "2026-06-12", editedBy: "Stav", answer: "38%", interest: "22%", note: "Tightened the offer line" },
+  { v: 1, date: "2026-06-04", editedBy: "Stav", answer: "33%", interest: "18%", note: "First version" },
+];
+
+const COMPLIANCE_ITEMS = [
+  "Business-only lead (not a private consumer)",
+  "Not marked Do Not Call",
+  "Within allowed calling hours",
+  "Valid caller ID set",
+  "AI disclosure enabled (if required)",
+  "Recording disclosure enabled (if recorded)",
+  "Opt-out honored on request",
+  "Internal Do Not Call list checked",
+];
+
+/* ============================================================
+   PRIMITIVES
+   ============================================================ */
+function Badge({ status }) {
+  const tone = STATUS_TONE[status] || "slate";
+  const s = toneStyle(tone);
+  return (
+    <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap"
+      style={{ background: s.bg, color: s.fg }}>
+      {status}
+    </span>
+  );
+}
+
+function Btn({ children, onClick, variant = "primary", size = "md", className = "", type, icon: Icon, disabled }) {
+  const sizes = { sm: "px-2.5 py-1.5 text-xs", md: "px-3.5 py-2 text-sm", lg: "px-5 py-2.5 text-sm" };
+  const base = "inline-flex items-center justify-center gap-1.5 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
+  const styles = {
+    primary: { background: C.ink, color: "#fff" },
+    gold: { background: C.gold, color: "#fff" },
+    ghost: { background: "#fff", color: C.text, border: `1px solid ${C.line}` },
+    soft: { background: C.slateBg, color: C.text },
+    danger: { background: C.redBg, color: C.red },
+    goldSoft: { background: C.goldSoft, color: C.gold, border: `1px solid ${C.goldLine}` },
+  };
+  return (
+    <button type={type || "button"} onClick={onClick} disabled={disabled}
+      className={`${base} ${sizes[size]} ${className}`} style={styles[variant]}>
+      {Icon && <Icon size={size === "sm" ? 13 : 15} />} {children}
+    </button>
+  );
+}
+
+function StatCard({ label, value, icon: Icon, tone = "ink", onClick, active }) {
+  const tones = {
+    ink: C.ink, gold: C.gold, green: C.green, red: C.red,
+    amber: C.amber, blue: C.blue, slate: C.slate,
+  };
+  const accent = tones[tone] || C.ink;
+  return (
+    <button onClick={onClick}
+      className="text-left rounded-2xl p-4 transition-shadow hover:shadow-md"
+      style={{ background: C.card, border: `1px solid ${active ? accent : C.line}`, cursor: onClick ? "pointer" : "default" }}>
+      <div className="flex items-start justify-between">
+        <div>
+          <div className="text-2xl font-bold leading-none" style={{ color: accent, fontFamily: SANS }}>{value}</div>
+          <div className="mt-1.5 text-xs font-medium" style={{ color: C.muted }}>{label}</div>
+        </div>
+        <div className="grid place-items-center rounded-lg" style={{ width: 34, height: 34, background: C.bg }}>
+          <Icon size={17} style={{ color: accent }} />
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function Card({ children, className = "", pad = true, style }) {
+  return (
+    <div className={`rounded-2xl ${pad ? "p-5" : ""} ${className}`}
+      style={{ background: C.card, border: `1px solid ${C.line}`, ...style }}>
+      {children}
+    </div>
+  );
+}
+
+function SectionTitle({ title, sub, right }) {
+  return (
+    <div className="flex items-end justify-between gap-3 mb-4 flex-wrap">
+      <div>
+        <h2 className="text-xl" style={{ fontFamily: FONT, color: C.text, fontWeight: 600 }}>{title}</h2>
+        {sub && <p className="text-sm mt-0.5" style={{ color: C.muted }}>{sub}</p>}
+      </div>
+      {right}
+    </div>
+  );
+}
+
+function Field({ label, children, hint }) {
+  return (
+    <label className="block">
+      <span className="block text-xs font-semibold mb-1.5" style={{ color: C.text }}>{label}</span>
+      {children}
+      {hint && <span className="block text-xs mt-1" style={{ color: C.faint }}>{hint}</span>}
+    </label>
+  );
+}
+
+const inputCls = "w-full rounded-lg px-3 py-2 text-sm outline-none";
+const inputStyle = { background: "#fff", border: `1px solid ${C.line}`, color: C.text };
+
+function Modal({ open, onClose, title, children, width = "max-w-2xl" }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4"
+      style={{ background: "rgba(23,22,29,0.45)" }} onClick={onClose}>
+      <div className={`w-full ${width} my-8 rounded-2xl`} style={{ background: C.card }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: `1px solid ${C.line}` }}>
+          <h3 className="text-lg" style={{ fontFamily: FONT, fontWeight: 600, color: C.text }}>{title}</h3>
+          <button onClick={onClose} className="grid place-items-center rounded-lg" style={{ width: 32, height: 32, background: C.bg }}>
+            <X size={16} style={{ color: C.muted }} />
+          </button>
+        </div>
+        <div className="p-5">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function Toggle({ on, onChange }) {
+  return (
+    <button onClick={() => onChange(!on)} className="relative rounded-full transition-colors"
+      style={{ width: 40, height: 22, background: on ? C.gold : C.line }}>
+      <span className="absolute top-0.5 rounded-full bg-white transition-all" style={{ width: 18, height: 18, left: on ? 20 : 2 }} />
+    </button>
+  );
+}
+
+/* ============================================================
+   SIDEBAR + TOPBAR
+   ============================================================ */
+const NAV = [
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "leads", label: "Leads", icon: Users },
+  { id: "map", label: "Find Stores", icon: MapPin },
+  { id: "scripts", label: "Call Scripts", icon: FileText },
+  { id: "calling", label: "Calling Panel", icon: PhoneCall },
+  { id: "history", label: "Call History", icon: History },
+  { id: "followups", label: "Follow-ups", icon: CalendarClock },
+  { id: "catalog", label: "Catalog & Email", icon: Mail },
+  { id: "compliance", label: "Compliance", icon: Shield },
+  { id: "reports", label: "Reports", icon: BarChart3 },
+  { id: "settings", label: "Settings", icon: Settings },
+];
+
+function Sidebar({ view, setView, open, setOpen }) {
+  return (
+    <>
+      {open && <div className="fixed inset-0 z-30 lg:hidden" style={{ background: "rgba(23,22,29,0.4)" }} onClick={() => setOpen(false)} />}
+      <aside className={`fixed z-40 lg:static inset-y-0 left-0 w-64 flex flex-col transition-transform ${open ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
+        style={{ background: C.ink }}>
+        <div className="px-5 py-5 flex items-center gap-3" style={{ borderBottom: `1px solid ${C.inkSoft}` }}>
+          <div className="grid place-items-center rounded-lg" style={{ width: 38, height: 38, background: C.gold }}>
+            <span style={{ fontFamily: FONT, color: "#fff", fontWeight: 700, fontSize: 18 }}>J</span>
+          </div>
+          <div>
+            <div style={{ fontFamily: FONT, color: "#fff", fontWeight: 600, fontSize: 17, letterSpacing: "0.04em" }}>JEWELAR</div>
+            <div className="text-xs" style={{ color: C.faint }}>Wholesale Calling CRM</div>
+          </div>
+        </div>
+        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+          {NAV.map((n) => {
+            const active = view === n.id;
+            return (
+              <button key={n.id} onClick={() => { setView(n.id); setOpen(false); }}
+                className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors"
+                style={{ background: active ? C.goldSoft : "transparent", color: active ? C.ink : "#C9C6CF" }}>
+                <n.icon size={17} style={{ color: active ? C.gold : "#8A8794" }} />
+                {n.label}
+              </button>
+            );
+          })}
+        </nav>
+        <div className="px-5 py-4" style={{ borderTop: `1px solid ${C.inkSoft}` }}>
+          <div className="flex items-center gap-2 text-xs" style={{ color: C.faint }}>
+            <CircleDot size={13} style={{ color: C.green }} /> B2B mode · Mock data
+          </div>
+        </div>
+      </aside>
+    </>
+  );
+}
+
+function Topbar({ onMenu, onTest }) {
+  return (
+    <header className="sticky top-0 z-20 flex items-center gap-3 px-4 lg:px-7 py-3"
+      style={{ background: "rgba(250,248,244,0.85)", backdropFilter: "blur(8px)", borderBottom: `1px solid ${C.line}` }}>
+      <button onClick={onMenu} className="lg:hidden grid place-items-center rounded-lg" style={{ width: 36, height: 36, background: "#fff", border: `1px solid ${C.line}` }}>
+        <Menu size={18} style={{ color: C.text }} />
+      </button>
+      <div className="flex-1 max-w-md relative">
+        <Search size={16} style={{ color: C.faint, position: "absolute", left: 12, top: 10 }} />
+        <input placeholder="Search leads, stores, phone numbers" className="w-full rounded-lg pl-9 pr-3 py-2 text-sm outline-none"
+          style={{ background: "#fff", border: `1px solid ${C.line}`, color: C.text }} />
+      </div>
+      <div className="ml-auto flex items-center gap-2">
+        <Btn variant="goldSoft" size="sm" icon={Phone} onClick={onTest} className="hidden sm:inline-flex">Test AI call</Btn>
+        <button className="grid place-items-center rounded-lg relative" style={{ width: 36, height: 36, background: "#fff", border: `1px solid ${C.line}` }}>
+          <Bell size={17} style={{ color: C.text }} />
+          <span className="absolute rounded-full" style={{ width: 7, height: 7, background: C.gold, top: 7, right: 8 }} />
+        </button>
+        <div className="grid place-items-center rounded-full" style={{ width: 36, height: 36, background: C.ink, color: "#fff", fontSize: 13, fontWeight: 600 }}>SE</div>
+      </div>
+    </header>
+  );
+}
+
+/* ============================================================
+   DASHBOARD
+   ============================================================ */
+function Dashboard({ leads, calls, setView, openLead }) {
+  const today = "2026-06-24";
+  const count = (fn) => leads.filter(fn).length;
+  const callsToday = calls.filter((c) => c.datetime.startsWith(today)).length;
+  const stats = [
+    { label: "Total stores", value: leads.length, icon: Building2, tone: "ink" },
+    { label: "Calls today", value: callsToday, icon: PhoneCall, tone: "blue" },
+    { label: "Answered", value: calls.filter((c) => !["No answer", "Voicemail", "Busy", "Call failed"].includes(c.outcome)).length, icon: PhoneIncoming, tone: "blue" },
+    { label: "No answer", value: calls.filter((c) => c.outcome === "No answer").length, icon: PhoneOff, tone: "slate" },
+    { label: "Interested", value: count((l) => l.status === "Interested"), icon: ThumbsUp, tone: "green" },
+    { label: "Wants catalog", value: count((l) => l.status === "Wants catalog"), icon: FileText, tone: "green" },
+    { label: "Wants callback", value: count((l) => l.status === "Wants callback"), icon: Clock, tone: "amber" },
+    { label: "Not interested", value: count((l) => l.status === "Not interested"), icon: ThumbsDown, tone: "red" },
+    { label: "Do not call", value: count((l) => l.dnc), icon: PhoneOff, tone: "red" },
+  ];
+  const dueToday = leads.filter((l) => l.nextFollowUp === today);
+  const recent = calls.slice().sort((a, b) => b.datetime.localeCompare(a.datetime)).slice(0, 5);
+  return (
+    <div>
+      <SectionTitle title="Dashboard" sub="Your wholesale calling operation at a glance" />
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3 mb-6">
+        {stats.map((s) => <StatCard key={s.label} {...s} onClick={() => setView("leads")} />)}
+      </div>
+      <div className="grid lg:grid-cols-3 gap-5">
+        <Card className="lg:col-span-2" pad={false}>
+          <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: `1px solid ${C.line}` }}>
+            <h3 className="font-semibold" style={{ color: C.text }}>Recent calls</h3>
+            <Btn variant="ghost" size="sm" onClick={() => setView("history")}>View all</Btn>
+          </div>
+          <div>
+            {recent.map((c) => (
+              <button key={c.id} onClick={() => openLead(c.leadId)}
+                className="w-full flex items-center gap-3 px-5 py-3 text-left hover:bg-stone-50 transition-colors"
+                style={{ borderBottom: `1px solid ${C.line}` }}>
+                <div className="grid place-items-center rounded-lg shrink-0" style={{ width: 34, height: 34, background: C.bg }}>
+                  <Phone size={15} style={{ color: C.gold }} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium truncate" style={{ color: C.text }}>{c.store}</div>
+                  <div className="text-xs" style={{ color: C.muted }}>{c.datetime} · {c.duration}</div>
+                </div>
+                <Badge status={c.outcome} />
+              </button>
+            ))}
+          </div>
+        </Card>
+        <Card pad={false}>
+          <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: `1px solid ${C.line}` }}>
+            <h3 className="font-semibold" style={{ color: C.text }}>Follow-ups due today</h3>
+            <span className="text-xs font-semibold rounded-full px-2 py-0.5" style={{ background: C.amberBg, color: C.amber }}>{dueToday.length}</span>
+          </div>
+          <div className="p-3">
+            {dueToday.length === 0 && <p className="text-sm px-2 py-6 text-center" style={{ color: C.faint }}>Nothing due today.</p>}
+            {dueToday.map((l) => (
+              <button key={l.id} onClick={() => openLead(l.id)} className="w-full text-left rounded-lg px-3 py-2.5 hover:bg-stone-50 transition-colors">
+                <div className="text-sm font-medium truncate" style={{ color: C.text }}>{l.name}</div>
+                <div className="flex items-center gap-2 mt-0.5"><Badge status={l.status} /><span className="text-xs" style={{ color: C.muted }}>{l.phone}</span></div>
+              </button>
+            ))}
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   LEAD TABLE
+   ============================================================ */
+const ALL_STATUSES = ["New", "Answered", "No answer", "Busy", "Voicemail", "Interested", "Wants catalog", "Wants callback", "Requested price list", "Requested email", "Not interested", "Do not call", "Wrong number", "Call failed"];
+
+function ScorePill({ score }) {
+  const tone = score >= 75 ? C.green : score >= 50 ? C.amber : C.red;
+  const bg = score >= 75 ? C.greenBg : score >= 50 ? C.amberBg : C.redBg;
+  return <span className="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-bold" style={{ background: bg, color: tone }}>{score}</span>;
+}
+
+function LeadTable({ leads, openLead, onCall, onUpdate, onNote }) {
+  const [q, setQ] = useState("");
+  const [filter, setFilter] = useState("All");
+  const filtered = leads.filter((l) => {
+    const matchQ = (l.name + l.phone + l.address).toLowerCase().includes(q.toLowerCase());
+    const matchF = filter === "All" || (filter === "Do not call" ? l.dnc : l.status === filter);
+    return matchQ && matchF;
+  });
+  const quickFilters = ["All", "Interested", "Wants catalog", "Wants callback", "Not interested", "Do not call"];
+  return (
+    <div>
+      <SectionTitle title="Leads" sub={`${leads.length} jewelry store leads`}
+        right={<Btn variant="gold" icon={Plus} onClick={() => onUpdate("__add__")}>Add lead</Btn>} />
+      <Card pad={false}>
+        <div className="flex flex-wrap items-center gap-2 px-4 py-3" style={{ borderBottom: `1px solid ${C.line}` }}>
+          <div className="relative flex-1" style={{ minWidth: 200 }}>
+            <Search size={15} style={{ color: C.faint, position: "absolute", left: 10, top: 9 }} />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search store, phone, address"
+              className="w-full rounded-lg pl-8 pr-3 py-2 text-sm outline-none" style={inputStyle} />
+          </div>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {quickFilters.map((f) => (
+              <button key={f} onClick={() => setFilter(f)} className="rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors"
+                style={{ background: filter === f ? C.ink : "#fff", color: filter === f ? "#fff" : C.muted, border: `1px solid ${filter === f ? C.ink : C.line}` }}>
+                {f}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm" style={{ minWidth: 940 }}>
+            <thead>
+              <tr style={{ color: C.muted }}>
+                {["Store", "Phone", "Source", "Status", "Last call", "Next follow-up", "Score", ""].map((h) => (
+                  <th key={h} className="text-left font-semibold px-4 py-2.5 text-xs uppercase tracking-wide" style={{ borderBottom: `1px solid ${C.line}` }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((l) => (
+                <tr key={l.id} className="hover:bg-stone-50 transition-colors" style={{ borderBottom: `1px solid ${C.line}` }}>
+                  <td className="px-4 py-3">
+                    <button onClick={() => openLead(l.id)} className="text-left">
+                      <div className="font-semibold" style={{ color: C.text }}>{l.name}</div>
+                      <div className="text-xs truncate" style={{ color: C.faint, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis" }}>{l.address}</div>
+                    </button>
+                  </td>
+                  <td className="px-4 py-3" style={{ color: C.text }}>{l.phone}</td>
+                  <td className="px-4 py-3"><span className="text-xs" style={{ color: C.muted }}>{l.source}</span></td>
+                  <td className="px-4 py-3">{l.dnc ? <Badge status="Do not call" /> : <Badge status={l.status} />}</td>
+                  <td className="px-4 py-3 text-xs" style={{ color: C.muted }}>{l.lastCall || "—"}</td>
+                  <td className="px-4 py-3 text-xs" style={{ color: l.nextFollowUp ? C.amber : C.faint, fontWeight: l.nextFollowUp ? 600 : 400 }}>{l.nextFollowUp || "—"}</td>
+                  <td className="px-4 py-3"><ScorePill score={l.score} /></td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-end gap-1">
+                      <button title="Start AI call" disabled={l.dnc} onClick={() => onCall(l)} className="grid place-items-center rounded-md disabled:opacity-30" style={{ width: 30, height: 30, background: C.goldSoft }}>
+                        <Phone size={14} style={{ color: C.gold }} />
+                      </button>
+                      <button title="View details" onClick={() => openLead(l.id)} className="grid place-items-center rounded-md" style={{ width: 30, height: 30, background: C.bg }}>
+                        <ChevronRight size={15} style={{ color: C.muted }} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {filtered.length === 0 && <p className="text-center py-10 text-sm" style={{ color: C.faint }}>No leads match this filter.</p>}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+/* ============================================================
+   LEAD DETAILS (modal)
+   ============================================================ */
+function HistoryRow({ icon: Icon, title, sub, badge, tone }) {
+  return (
+    <div className="flex items-start gap-3 py-2.5" style={{ borderBottom: `1px solid ${C.line}` }}>
+      <div className="grid place-items-center rounded-lg shrink-0 mt-0.5" style={{ width: 30, height: 30, background: C.bg }}>
+        <Icon size={14} style={{ color: tone || C.muted }} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-sm" style={{ color: C.text }}>{title}</div>
+        {sub && <div className="text-xs mt-0.5" style={{ color: C.muted }}>{sub}</div>}
+      </div>
+      {badge && <Badge status={badge} />}
+    </div>
+  );
+}
+
+function LeadDetails({ lead, calls, onClose, onCall, onUpdate, onCatalog }) {
+  const [tab, setTab] = useState("overview");
+  const [note, setNote] = useState("");
+  if (!lead) return null;
+  const leadCalls = calls.filter((c) => c.leadId === lead.id);
+  const tabs = [["overview", "Overview"], ["calls", "Calls"], ["comms", "Email / SMS"], ["followup", "Follow-up"]];
+  const info = [
+    ["Phone", lead.phone], ["Email", lead.email || "Not found yet"], ["Website", lead.website || "—"],
+    ["Address", lead.address], ["Google rating", lead.rating ? `${lead.rating} / 5` : "—"],
+    ["Lead source", lead.source], ["Catalog", lead.catalog],
+  ];
+  return (
+    <Modal open={!!lead} onClose={onClose} title={lead.name} width="max-w-3xl">
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        {lead.dnc ? <Badge status="Do not call" /> : <Badge status={lead.status} />}
+        <ScorePill score={lead.score} />
+        <span className="text-xs" style={{ color: C.muted }}>{lead.source}</span>
+        <div className="ml-auto flex items-center gap-2">
+          <span className="text-xs font-semibold" style={{ color: C.text }}>Do Not Call</span>
+          <Toggle on={lead.dnc} onChange={(v) => onUpdate(lead.id, { dnc: v, status: v ? "Do not call" : lead.status })} />
+        </div>
+      </div>
+      <div className="flex gap-1 mb-4 p-1 rounded-xl" style={{ background: C.bg }}>
+        {tabs.map(([k, lbl]) => (
+          <button key={k} onClick={() => setTab(k)} className="flex-1 rounded-lg py-2 text-sm font-semibold transition-colors"
+            style={{ background: tab === k ? "#fff" : "transparent", color: tab === k ? C.ink : C.muted, boxShadow: tab === k ? "0 1px 2px rgba(0,0,0,0.06)" : "none" }}>
+            {lbl}
+          </button>
+        ))}
+      </div>
+
+      {tab === "overview" && (
+        <div>
+          <div className="grid sm:grid-cols-2 gap-x-6 gap-y-2.5 mb-5">
+            {info.map(([k, v]) => (
+              <div key={k} className="flex justify-between gap-3 py-1.5" style={{ borderBottom: `1px solid ${C.line}` }}>
+                <span className="text-xs font-semibold" style={{ color: C.muted }}>{k}</span>
+                <span className="text-sm text-right truncate" style={{ color: C.text }}>{v}</span>
+              </div>
+            ))}
+          </div>
+          <Field label="Notes">
+            <div className="rounded-lg p-3 text-sm" style={{ background: C.bg, color: C.text, minHeight: 56 }}>{lead.notes || "No notes yet."}</div>
+          </Field>
+          <div className="flex gap-2 mt-3">
+            <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Add a note" className={inputCls} style={inputStyle} />
+            <Btn variant="soft" onClick={() => { if (note.trim()) { onUpdate(lead.id, { notes: lead.notes ? lead.notes + " · " + note : note }); setNote(""); } }}>Add</Btn>
+          </div>
+        </div>
+      )}
+
+      {tab === "calls" && (
+        <div>
+          {leadCalls.length === 0 && <p className="text-sm py-6 text-center" style={{ color: C.faint }}>No calls logged for this lead.</p>}
+          {leadCalls.map((c) => (
+            <div key={c.id} className="rounded-xl p-3.5 mb-2.5" style={{ background: C.bg }}>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-semibold" style={{ color: C.muted }}>{c.datetime} · {c.duration} · {c.mode}</span>
+                <Badge status={c.outcome} />
+              </div>
+              <p className="text-sm" style={{ color: C.text }}>{c.summary}</p>
+              {c.objections !== "—" && <p className="text-xs mt-1.5" style={{ color: C.muted }}><b>Objection:</b> {c.objections}</p>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab === "comms" && (
+        <div>
+          <HistoryRow icon={Mail} title="Intro email" sub={lead.email ? "Ready to send to " + lead.email : "No email on file"} badge={lead.catalog === "Sent" ? "Completed" : "Ready"} tone={C.blue} />
+          <HistoryRow icon={FileText} title="Catalog / line sheet" sub={lead.catalog === "Sent" ? "Sent" : lead.catalog === "Requested" ? "Requested by store" : "Not sent"} tone={C.gold} />
+          <HistoryRow icon={MessageSquare} title="SMS link" sub="Placeholder — sending disabled" tone={C.slate} />
+          <div className="flex flex-wrap gap-2 mt-4">
+            <Btn variant="goldSoft" size="sm" icon={FileText} onClick={() => onCatalog(lead, "Catalog")}>Send catalog</Btn>
+            <Btn variant="ghost" size="sm" icon={DollarSign} onClick={() => onCatalog(lead, "Price list")}>Send price list</Btn>
+            <Btn variant="ghost" size="sm" icon={MessageSquare} onClick={() => onCatalog(lead, "SMS link")}>Send SMS</Btn>
+          </div>
+        </div>
+      )}
+
+      {tab === "followup" && (
+        <div className="space-y-3">
+          <Field label="Next follow-up date">
+            <input type="date" value={lead.nextFollowUp} onChange={(e) => onUpdate(lead.id, { nextFollowUp: e.target.value })} className={inputCls} style={inputStyle} />
+          </Field>
+          <Field label="Follow-up status">
+            <div className="flex flex-wrap gap-1.5">
+              {["Call again", "Send catalog", "Send price list", "Waiting for reply", "Closed lost", "Closed won"].map((s) => (
+                <button key={s} onClick={() => onUpdate(lead.id, { status: s === "Closed won" || s === "Closed lost" ? lead.status : lead.status })}
+                  className="rounded-lg px-2.5 py-1.5 text-xs font-semibold" style={{ background: C.bg, color: C.text, border: `1px solid ${C.line}` }}>{s}</button>
+              ))}
+            </div>
+          </Field>
+          <Field label="Reminder notes">
+            <textarea rows={2} defaultValue={lead.notes} className={inputCls} style={inputStyle} />
+          </Field>
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-2 mt-6 pt-4" style={{ borderTop: `1px solid ${C.line}` }}>
+        <Btn variant="gold" icon={Phone} disabled={lead.dnc} onClick={() => onCall(lead)}>Start AI call</Btn>
+        <Btn variant="soft" icon={ThumbsUp} onClick={() => onUpdate(lead.id, { status: "Interested", score: Math.max(lead.score, 80) })}>Mark interested</Btn>
+        <Btn variant="soft" icon={Clock} onClick={() => onUpdate(lead.id, { status: "Wants callback" })}>Mark follow-up</Btn>
+        <Btn variant="danger" icon={PhoneOff} onClick={() => onUpdate(lead.id, { dnc: true, status: "Do not call" })}>Do not call</Btn>
+      </div>
+    </Modal>
+  );
+}
+
+/* ============================================================
+   GOOGLE MAPS PLACEHOLDER
+   ============================================================ */
+const MAP_RESULTS = [
+  { name: "Willow & Birch", phone: "(305) 555-0210", address: "78 NW 25th St, Miami, FL 33127", website: "willowbirch.co", rating: 4.6 },
+  { name: "Seabird Studio", phone: "(786) 555-0233", address: "215 NE 2nd Ave, Miami, FL 33132", website: "seabirdstudio.com", rating: 4.4 },
+  { name: "Honeycomb Boutique", phone: "(954) 555-0288", address: "905 E Las Olas Blvd, Fort Lauderdale, FL 33301", website: "honeycombshop.co", rating: 4.8 },
+  { name: "Petal & Pearl", phone: "(561) 555-0245", address: "313 Clematis St, West Palm Beach, FL 33401", website: "petalandpearl.com", rating: 4.5 },
+];
+
+function MapSearch({ onAdd, addedNames }) {
+  const [results, setResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const searchGooglePlaces = () => {
+    setSearching(true);
+    setResults([]);
+    setTimeout(() => { setResults(MAP_RESULTS); setSearching(false); }, 700);
+  };
+  return (
+    <div>
+      <SectionTitle title="Find Stores" sub="Discover jewelry boutiques to add to your CRM" />
+      <Card className="mb-5">
+        <div className="grid md:grid-cols-5 gap-3">
+          <div className="md:col-span-2"><Field label="Search"><input placeholder="jewelry boutique" className={inputCls} style={inputStyle} /></Field></div>
+          <Field label="City"><input placeholder="Miami, FL" className={inputCls} style={inputStyle} /></Field>
+          <Field label="Radius">
+            <select className={inputCls} style={inputStyle}><option>5 mi</option><option>10 mi</option><option>25 mi</option><option>50 mi</option></select>
+          </Field>
+          <Field label="Business type">
+            <select className={inputCls} style={inputStyle}><option>Boutique</option><option>Jewelry store</option><option>Gift shop</option><option>Accessories</option></select>
+          </Field>
+        </div>
+        <div className="mt-4"><Btn variant="gold" icon={Search} onClick={searchGooglePlaces}>Find jewelry stores</Btn></div>
+      </Card>
+
+      <div className="grid lg:grid-cols-2 gap-5">
+        <Card pad={false} className="overflow-hidden">
+          <div className="px-5 py-3" style={{ borderBottom: `1px solid ${C.line}` }}><h3 className="font-semibold text-sm" style={{ color: C.text }}>Map</h3></div>
+          <div className="relative grid place-items-center" style={{ height: 360, background: "linear-gradient(135deg,#EFEDE6,#F6F4EE)" }}>
+            <div className="absolute inset-0" style={{ backgroundImage: `linear-gradient(${C.line} 1px,transparent 1px),linear-gradient(90deg,${C.line} 1px,transparent 1px)`, backgroundSize: "40px 40px", opacity: 0.5 }} />
+            {[{ t: 80, l: 120 }, { t: 160, l: 240 }, { t: 220, l: 90 }, { t: 130, l: 330 }].map((p, i) => (
+              <MapPin key={i} size={26} style={{ color: C.gold, position: "absolute", top: p.t, left: p.l }} />
+            ))}
+            <div className="relative text-center">
+              <div className="text-sm font-semibold" style={{ color: C.muted }}>Map preview</div>
+              <div className="text-xs" style={{ color: C.faint }}>Google Maps connects later</div>
+            </div>
+          </div>
+        </Card>
+
+        <Card pad={false}>
+          <div className="px-5 py-3 flex items-center justify-between" style={{ borderBottom: `1px solid ${C.line}` }}>
+            <h3 className="font-semibold text-sm" style={{ color: C.text }}>Results</h3>
+            {results.length > 0 && <span className="text-xs" style={{ color: C.muted }}>{results.length} stores</span>}
+          </div>
+          <div className="p-3 space-y-2.5" style={{ maxHeight: 360, overflowY: "auto" }}>
+            {searching && <p className="text-sm text-center py-12" style={{ color: C.muted }}>Searching nearby boutiques…</p>}
+            {!searching && results.length === 0 && <p className="text-sm text-center py-12" style={{ color: C.faint }}>Run a search to see jewelry stores here.</p>}
+            {results.map((r) => {
+              const added = addedNames.includes(r.name);
+              return (
+                <div key={r.name} className="rounded-xl p-3.5 flex items-start gap-3" style={{ background: C.bg }}>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2"><span className="font-semibold text-sm" style={{ color: C.text }}>{r.name}</span><span className="text-xs inline-flex items-center gap-0.5" style={{ color: C.gold }}><Star size={11} fill={C.gold} />{r.rating}</span></div>
+                    <div className="text-xs mt-0.5" style={{ color: C.muted }}>{r.phone} · {r.website}</div>
+                    <div className="text-xs" style={{ color: C.faint }}>{r.address}</div>
+                  </div>
+                  <Btn variant={added ? "soft" : "goldSoft"} size="sm" icon={added ? Check : Plus} disabled={added} onClick={() => onAdd(r)}>{added ? "Added" : "Add to CRM"}</Btn>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   AI CALL SCRIPT MANAGER
+   ============================================================ */
+function ScriptEditor({ script, setScript, versions, onSaveVersion }) {
+  const [preview, setPreview] = useState(false);
+  const update = (k, v) => setScript({ ...script, [k]: v });
+  return (
+    <div>
+      <SectionTitle title="Call Scripts" sub="Edit exactly what the AI says on every call"
+        right={<div className="flex gap-2">
+          <Btn variant="ghost" icon={Copy} onClick={() => onSaveVersion("duplicate")}>Duplicate</Btn>
+          <Btn variant="ghost" icon={RotateCcw} onClick={() => onSaveVersion("restore")}>Restore previous</Btn>
+          <Btn variant="gold" icon={Save} onClick={() => onSaveVersion("save")}>Save script</Btn>
+        </div>} />
+      <div className="grid lg:grid-cols-3 gap-5">
+        <div className="lg:col-span-2">
+          <Card>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold" style={{ color: C.text }}>Standard Wholesale Intro</h3>
+              <Btn variant="soft" size="sm" icon={preview ? Pencil : FileText} onClick={() => setPreview(!preview)}>{preview ? "Edit" : "Preview"}</Btn>
+            </div>
+            {preview ? (
+              <div className="space-y-3">
+                {SCRIPT_FIELDS.map(([k, label]) => (
+                  <div key={k}>
+                    <div className="text-xs font-semibold mb-1" style={{ color: C.gold }}>{label}</div>
+                    <p className="text-sm rounded-lg p-3" style={{ background: C.bg, color: C.text }}>{script[k]}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-3.5">
+                {SCRIPT_FIELDS.map(([k, label]) => (
+                  <Field key={k} label={label}>
+                    <textarea rows={k === "qualify" || k === "objection" ? 3 : 2} value={script[k]} onChange={(e) => update(k, e.target.value)} className={inputCls} style={inputStyle} />
+                  </Field>
+                ))}
+              </div>
+            )}
+          </Card>
+        </div>
+        <div>
+          <Card pad={false}>
+            <div className="px-5 py-3 flex items-center gap-2" style={{ borderBottom: `1px solid ${C.line}` }}>
+              <History size={15} style={{ color: C.muted }} /><h3 className="font-semibold text-sm" style={{ color: C.text }}>Version history</h3>
+            </div>
+            <div className="p-3 space-y-2">
+              {versions.map((v) => (
+                <div key={v.v} className="rounded-xl p-3" style={{ background: C.bg, border: v.note === "Current" ? `1px solid ${C.goldLine}` : "none" }}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold" style={{ color: C.text }}>Version {v.v}</span>
+                    {v.note === "Current" ? <span className="text-xs font-semibold rounded-full px-2 py-0.5" style={{ background: C.goldSoft, color: C.gold }}>Current</span> : <span className="text-xs" style={{ color: C.faint }}>{v.note}</span>}
+                  </div>
+                  <div className="text-xs mt-1" style={{ color: C.muted }}>{v.date} · {v.editedBy}</div>
+                  <div className="flex gap-3 mt-2 text-xs" style={{ color: C.muted }}>
+                    <span>Answer <b style={{ color: C.text }}>{v.answer}</b></span>
+                    <span>Interest <b style={{ color: C.text }}>{v.interest}</b></span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   AI CALLING PANEL  (simulated live call)
+   ============================================================ */
+const SIM_TRANSCRIPT = [
+  { who: "ai", text: "Hi, this is Ava calling on behalf of Jewelar. Is this a good moment for a quick word with whoever handles buying?" },
+  { who: "cust", text: "Sure, this is the owner. What's this about?" },
+  { who: "ai", text: "Jewelar is a wholesale gold-plated fashion jewelry brand. We supply boutiques with earrings, necklaces and rings at three to four times retail margins." },
+  { who: "cust", text: "Interesting. What are your minimums?" },
+  { who: "ai", text: "Low minimums — ten pieces per style, mix and match, and free shipping on first orders over a hundred and fifty dollars." },
+  { who: "cust", text: "Okay, can you send me a catalog with pricing?" },
+  { who: "ai", text: "Absolutely. What's the best email for your line sheet?" },
+];
+const CALL_OUTCOMES = ["Answered", "No answer", "Busy", "Voicemail", "Interested", "Wants catalog", "Wants callback", "Requested price list", "Requested email", "Not interested", "Do not call", "Wrong number", "Call failed"];
+
+function CallingPanel({ lead, leads, onPickLead, onComplete, compliancePassed }) {
+  const [mode, setMode] = useState("AI");
+  const [status, setStatus] = useState("Ready");
+  const [shown, setShown] = useState(0);
+  const [outcome, setOutcome] = useState("");
+  const [notes, setNotes] = useState("");
+  const timer = useRef(null);
+  const active = lead;
+
+  useEffect(() => { setStatus("Ready"); setShown(0); setOutcome(""); setNotes(""); if (timer.current) clearInterval(timer.current); }, [lead]);
+  useEffect(() => () => timer.current && clearInterval(timer.current), []);
+
+  const startCall = () => {
+    if (!active) return;
+    setStatus("Calling"); setShown(0);
+    setTimeout(() => {
+      setStatus("Connected");
+      timer.current = setInterval(() => {
+        setShown((n) => {
+          if (n >= SIM_TRANSCRIPT.length) { clearInterval(timer.current); setStatus("Completed"); setOutcome("Wants catalog"); return n; }
+          return n + 1;
+        });
+      }, 1100);
+    }, 1300);
+  };
+  const endCall = () => { if (timer.current) clearInterval(timer.current); setStatus("Completed"); if (!outcome) setOutcome("Answered"); };
+
+  if (!active) {
+    return (
+      <div>
+        <SectionTitle title="Calling Panel" sub="Select a lead to begin" />
+        <Card>
+          <p className="text-sm mb-3" style={{ color: C.muted }}>Choose a store to call:</p>
+          <div className="grid sm:grid-cols-2 gap-2">
+            {leads.filter((l) => !l.dnc).slice(0, 8).map((l) => (
+              <button key={l.id} onClick={() => onPickLead(l.id)} className="text-left rounded-xl p-3 hover:shadow-sm transition-shadow" style={{ background: C.bg, border: `1px solid ${C.line}` }}>
+                <div className="font-semibold text-sm" style={{ color: C.text }}>{l.name}</div>
+                <div className="text-xs" style={{ color: C.muted }}>{l.phone}</div>
+              </button>
+            ))}
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  const statusTone = { Ready: C.slate, Calling: C.amber, Connected: C.green, Completed: C.blue, Failed: C.red }[status];
+  const transcript = SIM_TRANSCRIPT.slice(0, shown);
+  const lastCust = [...transcript].reverse().find((t) => t.who === "cust");
+  const lastAi = [...transcript].reverse().find((t) => t.who === "ai");
+
+  return (
+    <div>
+      <SectionTitle title="Calling Panel" sub={active.name} right={<Btn variant="ghost" size="sm" onClick={() => onPickLead(null)}>Change lead</Btn>} />
+      {!compliancePassed && (
+        <div className="rounded-xl p-3 mb-4 flex items-center gap-2.5" style={{ background: C.amberBg }}>
+          <AlertTriangle size={16} style={{ color: C.amber }} />
+          <span className="text-sm" style={{ color: C.amber }}>Compliance checklist not confirmed. Complete it in the Compliance tab before live calling.</span>
+        </div>
+      )}
+      <div className="grid lg:grid-cols-3 gap-5">
+        {/* Left: call control */}
+        <Card>
+          <div className="text-center pb-4 mb-4" style={{ borderBottom: `1px solid ${C.line}` }}>
+            <div className="mx-auto grid place-items-center rounded-full mb-3" style={{ width: 64, height: 64, background: C.goldSoft }}>
+              <Building2 size={26} style={{ color: C.gold }} />
+            </div>
+            <div className="font-semibold" style={{ color: C.text }}>{active.name}</div>
+            <div className="text-sm" style={{ color: C.muted }}>{active.phone}</div>
+            <div className="inline-flex items-center gap-1.5 mt-2 rounded-full px-3 py-1 text-xs font-semibold" style={{ background: C.bg, color: statusTone }}>
+              <CircleDot size={11} /> {status}
+            </div>
+          </div>
+          <div className="mb-4">
+            <div className="text-xs font-semibold mb-1.5" style={{ color: C.text }}>Script</div>
+            <div className="rounded-lg px-3 py-2 text-sm" style={{ background: C.bg, color: C.text }}>Standard Wholesale Intro v3</div>
+          </div>
+          <div className="mb-4">
+            <div className="text-xs font-semibold mb-1.5" style={{ color: C.text }}>Call mode</div>
+            <div className="flex gap-1.5">
+              {["AI", "Human", "Test"].map((m) => (
+                <button key={m} onClick={() => setMode(m)} className="flex-1 rounded-lg py-2 text-xs font-semibold" style={{ background: mode === m ? C.ink : "#fff", color: mode === m ? "#fff" : C.muted, border: `1px solid ${mode === m ? C.ink : C.line}` }}>{m}</button>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-2">
+            {(status === "Ready" || status === "Completed") && <Btn variant="gold" size="lg" icon={Phone} className="w-full" onClick={startCall}>{status === "Completed" ? "Call again" : "Start AI call"}</Btn>}
+            {(status === "Calling" || status === "Connected") && <>
+              <Btn variant="ghost" size="lg" icon={PhoneForwarded} className="w-full" onClick={() => setMode("Human")}>Transfer to human</Btn>
+              <Btn variant="danger" size="lg" icon={PhoneOff} className="w-full" onClick={endCall}>End call</Btn>
+            </>}
+          </div>
+        </Card>
+
+        {/* Middle: live transcript */}
+        <Card pad={false} className="lg:col-span-2 flex flex-col" style={{ minHeight: 460 }}>
+          <div className="px-5 py-3 flex items-center justify-between" style={{ borderBottom: `1px solid ${C.line}` }}>
+            <div className="flex items-center gap-2"><Mic size={15} style={{ color: status === "Connected" ? C.green : C.muted }} /><h3 className="font-semibold text-sm" style={{ color: C.text }}>Live transcript</h3></div>
+            {status === "Connected" && <span className="text-xs font-semibold inline-flex items-center gap-1.5" style={{ color: C.green }}><span className="rounded-full" style={{ width: 7, height: 7, background: C.green }} /> Recording</span>}
+          </div>
+          <div className="flex-1 p-4 space-y-3 overflow-y-auto" style={{ maxHeight: 300 }}>
+            {transcript.length === 0 && <p className="text-sm text-center py-16" style={{ color: C.faint }}>Transcript will appear here once the call connects.</p>}
+            {transcript.map((t, i) => (
+              <div key={i} className={`flex ${t.who === "ai" ? "justify-start" : "justify-end"}`}>
+                <div className="rounded-2xl px-3.5 py-2 text-sm" style={{ maxWidth: "80%", background: t.who === "ai" ? C.bg : C.ink, color: t.who === "ai" ? C.text : "#fff" }}>
+                  <div className="text-xs font-semibold mb-0.5" style={{ color: t.who === "ai" ? C.gold : "#C9C6CF" }}>{t.who === "ai" ? "AI · Ava" : "Customer"}</div>
+                  {t.text}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3 p-4" style={{ borderTop: `1px solid ${C.line}` }}>
+            <div className="rounded-lg p-3" style={{ background: C.bg }}>
+              <div className="text-xs font-semibold mb-1" style={{ color: C.gold }}>AI response</div>
+              <p className="text-xs" style={{ color: C.text }}>{lastAi ? lastAi.text : "—"}</p>
+            </div>
+            <div className="rounded-lg p-3" style={{ background: C.bg }}>
+              <div className="text-xs font-semibold mb-1" style={{ color: C.muted }}>Customer response</div>
+              <p className="text-xs" style={{ color: C.text }}>{lastCust ? lastCust.text : "—"}</p>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* Outcome capture */}
+      {status === "Completed" && (
+        <Card className="mt-5">
+          <h3 className="font-semibold mb-3" style={{ color: C.text }}>Save call outcome</h3>
+          <div className="grid lg:grid-cols-3 gap-4">
+            <Field label="Call outcome">
+              <select value={outcome} onChange={(e) => setOutcome(e.target.value)} className={inputCls} style={inputStyle}>
+                <option value="">Select outcome</option>
+                {CALL_OUTCOMES.map((o) => <option key={o}>{o}</option>)}
+              </select>
+            </Field>
+            <Field label="Call summary">
+              <input defaultValue="Owner requested catalog and pricing." className={inputCls} style={inputStyle} />
+            </Field>
+            <Field label="Next follow-up date"><input type="date" className={inputCls} style={inputStyle} /></Field>
+          </div>
+          <div className="mt-3"><Field label="Call notes"><textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Objections, next action, anything to remember" className={inputCls} style={inputStyle} /></Field></div>
+          <div className="flex gap-2 mt-4">
+            <Btn variant="gold" icon={Save} onClick={() => onComplete(active, outcome || "Answered", notes)}>Save call notes</Btn>
+            <Btn variant="ghost" onClick={() => { setStatus("Ready"); setShown(0); }}>Discard</Btn>
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================
+   CALL HISTORY
+   ============================================================ */
+function CallHistory({ calls, openLead }) {
+  const [open, setOpen] = useState(null);
+  const sorted = calls.slice().sort((a, b) => b.datetime.localeCompare(a.datetime));
+  return (
+    <div>
+      <SectionTitle title="Call History" sub={`${calls.length} calls logged`} />
+      <Card pad={false}>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm" style={{ minWidth: 820 }}>
+            <thead><tr style={{ color: C.muted }}>
+              {["Store", "Date / time", "Duration", "Mode", "Outcome", ""].map((h) => <th key={h} className="text-left font-semibold px-4 py-2.5 text-xs uppercase tracking-wide" style={{ borderBottom: `1px solid ${C.line}` }}>{h}</th>)}
+            </tr></thead>
+            <tbody>
+              {sorted.map((c) => (
+                <React.Fragment key={c.id}>
+                  <tr className="hover:bg-stone-50" style={{ borderBottom: `1px solid ${C.line}` }}>
+                    <td className="px-4 py-3 font-semibold" style={{ color: C.text }}>{c.store}</td>
+                    <td className="px-4 py-3 text-xs" style={{ color: C.muted }}>{c.datetime}</td>
+                    <td className="px-4 py-3 text-xs" style={{ color: C.text }}>{c.duration}</td>
+                    <td className="px-4 py-3 text-xs" style={{ color: C.muted }}>{c.mode}</td>
+                    <td className="px-4 py-3"><Badge status={c.outcome} /></td>
+                    <td className="px-4 py-3 text-right"><button onClick={() => setOpen(open === c.id ? null : c.id)} className="text-xs font-semibold" style={{ color: C.gold }}>{open === c.id ? "Hide" : "Transcript"}</button></td>
+                  </tr>
+                  {open === c.id && (
+                    <tr style={{ borderBottom: `1px solid ${C.line}` }}><td colSpan={6} className="px-4 py-3" style={{ background: C.bg }}>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div><div className="text-xs font-semibold mb-1" style={{ color: C.gold }}>Summary</div><p className="text-sm" style={{ color: C.text }}>{c.summary}</p>
+                          <div className="text-xs font-semibold mt-3 mb-1" style={{ color: C.muted }}>Objections</div><p className="text-sm" style={{ color: C.text }}>{c.objections}</p></div>
+                        <div><div className="text-xs font-semibold mb-1" style={{ color: C.muted }}>Notes</div><p className="text-sm" style={{ color: C.text }}>{c.notes || "—"}</p>
+                          <div className="text-xs font-semibold mt-3 mb-1" style={{ color: C.muted }}>Next follow-up</div><p className="text-sm" style={{ color: c.nextFollowUp ? C.amber : C.faint }}>{c.nextFollowUp || "None"}</p></div>
+                      </div>
+                    </td></tr>
+                  )}
+                </React.Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+/* ============================================================
+   COMPLIANCE CENTER
+   ============================================================ */
+function ComplianceChecklist({ checks, setChecks, settings, setSettings, passed }) {
+  const toggle = (i) => setChecks(checks.map((c, idx) => (idx === i ? !c : c)));
+  return (
+    <div>
+      <SectionTitle title="Compliance" sub="Confirm before every real calling session" />
+      <div className="grid lg:grid-cols-2 gap-5">
+        <Card>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold" style={{ color: C.text }}>Pre-call checklist</h3>
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-full px-2.5 py-1" style={{ background: passed ? C.greenBg : C.amberBg, color: passed ? C.green : C.amber }}>
+              {passed ? <ShieldCheck size={13} /> : <AlertTriangle size={13} />} {passed ? "Cleared to call" : "Action needed"}
+            </span>
+          </div>
+          <div className="space-y-1">
+            {COMPLIANCE_ITEMS.map((item, i) => (
+              <button key={i} onClick={() => toggle(i)} className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-stone-50 transition-colors">
+                <span className="grid place-items-center rounded-md shrink-0" style={{ width: 22, height: 22, background: checks[i] ? C.green : "#fff", border: `1px solid ${checks[i] ? C.green : C.line}` }}>
+                  {checks[i] && <Check size={14} color="#fff" />}
+                </span>
+                <span className="text-sm" style={{ color: C.text }}>{item}</span>
+              </button>
+            ))}
+          </div>
+        </Card>
+        <Card>
+          <h3 className="font-semibold mb-4" style={{ color: C.text }}>Calling settings</h3>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Calling hours start"><input type="time" defaultValue="09:00" className={inputCls} style={inputStyle} /></Field>
+              <Field label="Calling hours end"><input type="time" defaultValue="18:00" className={inputCls} style={inputStyle} /></Field>
+            </div>
+            <Field label="Timezone"><select className={inputCls} style={inputStyle}><option>Eastern (ET)</option><option>Central (CT)</option><option>Mountain (MT)</option><option>Pacific (PT)</option></select></Field>
+            <Field label="Caller ID number"><input defaultValue="(305) 555-0100" className={inputCls} style={inputStyle} /></Field>
+            {[
+              ["aiDisc", "AI disclosure", "Announce the call is from an AI assistant"],
+              ["recDisc", "Recording disclosure", "Announce the call may be recorded"],
+              ["approval", "Require approval before email/SMS", "You confirm each send manually"],
+              ["autostop", 'Auto-stop on "do not call"', "End and flag the lead immediately"],
+            ].map(([k, label, sub]) => (
+              <div key={k} className="flex items-center justify-between gap-3 py-1">
+                <div><div className="text-sm font-semibold" style={{ color: C.text }}>{label}</div><div className="text-xs" style={{ color: C.muted }}>{sub}</div></div>
+                <Toggle on={settings[k]} onChange={(v) => setSettings({ ...settings, [k]: v })} />
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   TEST AI CALL
+   ============================================================ */
+function TestCallPage({ tests, setTests }) {
+  const [phone, setPhone] = useState("");
+  const [running, setRunning] = useState(false);
+  const [done, setDone] = useState(false);
+  const [rating, setRating] = useState("");
+  const [improve, setImprove] = useState("");
+  const startManualTestCall = () => {
+    if (!phone) return;
+    setRunning(true); setDone(false);
+    setTimeout(() => { setRunning(false); setDone(true); }, 1600);
+  };
+  const saveTest = () => {
+    setTests([{ id: Date.now(), datetime: "2026-06-24 now", script: "Standard Wholesale Intro v3", voice: "Ava (warm)", scenario: "Manual test", rating: rating || "Good", improve }, ...tests]);
+    setDone(false); setRating(""); setImprove(""); setPhone("");
+  };
+  return (
+    <div>
+      <SectionTitle title="Test AI Call" sub="Call your own phone to hear the AI and refine the script" />
+      <div className="rounded-xl p-3 mb-5 flex items-center gap-2.5" style={{ background: C.blueBg }}>
+        <Phone size={16} style={{ color: C.blue }} />
+        <span className="text-sm" style={{ color: C.blue }}>Test calls are never saved as leads. They are flagged TEST and kept separately.</span>
+      </div>
+      <div className="grid lg:grid-cols-2 gap-5">
+        <Card>
+          <h3 className="font-semibold mb-4" style={{ color: C.text }}>Start a test call</h3>
+          <div className="space-y-4">
+            <Field label="My test phone number" hint="The AI will call this number so you can speak with it."><input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(305) 555-0000" className={inputCls} style={inputStyle} /></Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Select script"><select className={inputCls} style={inputStyle}><option>Standard Wholesale Intro v3</option><option>Short Intro v1</option></select></Field>
+              <Field label="Select voice"><select className={inputCls} style={inputStyle}><option>Ava (warm)</option><option>Noah (neutral)</option><option>Mia (bright)</option></select></Field>
+            </div>
+            <Field label="Test scenario notes"><textarea rows={2} placeholder="What do you want to test on this call?" className={inputCls} style={inputStyle} /></Field>
+            <Btn variant="gold" size="lg" icon={Phone} className="w-full" disabled={running} onClick={startManualTestCall}>{running ? "Calling your phone…" : "Start test call"}</Btn>
+          </div>
+
+          {done && (
+            <div className="mt-5 pt-5" style={{ borderTop: `1px solid ${C.line}` }}>
+              <h4 className="font-semibold mb-3" style={{ color: C.text }}>Rate this test</h4>
+              <div className="flex gap-2 mb-3">
+                {[["Good", C.green, C.greenBg], ["Needs improvement", C.amber, C.amberBg], ["Bad", C.red, C.redBg]].map(([r, fg, bg]) => (
+                  <button key={r} onClick={() => setRating(r)} className="rounded-lg px-3 py-2 text-xs font-semibold" style={{ background: rating === r ? fg : bg, color: rating === r ? "#fff" : fg }}>{r}</button>
+                ))}
+              </div>
+              <Field label="What should the AI improve?"><textarea rows={2} value={improve} onChange={(e) => setImprove(e.target.value)} className={inputCls} style={inputStyle} /></Field>
+              <div className="mt-3"><Btn variant="primary" icon={Save} onClick={saveTest}>Save test result</Btn></div>
+            </div>
+          )}
+        </Card>
+
+        <Card pad={false}>
+          <div className="px-5 py-3" style={{ borderBottom: `1px solid ${C.line}` }}><h3 className="font-semibold text-sm" style={{ color: C.text }}>Test history</h3></div>
+          <div className="p-3 space-y-2.5">
+            {tests.map((t) => {
+              const tone = t.rating === "Good" ? [C.green, C.greenBg] : t.rating === "Bad" ? [C.red, C.redBg] : [C.amber, C.amberBg];
+              return (
+                <div key={t.id} className="rounded-xl p-3.5" style={{ background: C.bg }}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-semibold" style={{ color: C.muted }}>{t.datetime} · {t.voice}</span>
+                    <span className="text-xs font-semibold rounded-full px-2 py-0.5" style={{ background: tone[1], color: tone[0] }}>{t.rating}</span>
+                  </div>
+                  <div className="text-sm font-medium" style={{ color: C.text }}>{t.script}</div>
+                  {t.improve && <p className="text-xs mt-1" style={{ color: C.muted }}><b>Improve:</b> {t.improve}</p>}
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   FOLLOW-UP PANEL
+   ============================================================ */
+function FollowUpPanel({ leads, openLead, onUpdate }) {
+  const withFollow = leads.filter((l) => l.nextFollowUp).sort((a, b) => a.nextFollowUp.localeCompare(b.nextFollowUp));
+  const today = "2026-06-24";
+  const statuses = ["Call again", "Send catalog", "Send price list", "Waiting for reply", "Closed lost", "Closed won"];
+  const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(2026, 5, 24 + i); return d.toISOString().slice(0, 10); });
+  return (
+    <div>
+      <SectionTitle title="Follow-ups" sub={`${withFollow.length} scheduled`} />
+      <div className="grid lg:grid-cols-3 gap-5">
+        <Card pad={false} className="lg:col-span-2">
+          <div className="px-5 py-3" style={{ borderBottom: `1px solid ${C.line}` }}><h3 className="font-semibold text-sm" style={{ color: C.text }}>Upcoming</h3></div>
+          <div>
+            {withFollow.map((l) => {
+              const due = l.nextFollowUp <= today;
+              return (
+                <div key={l.id} className="flex items-center gap-3 px-5 py-3 hover:bg-stone-50 transition-colors" style={{ borderBottom: `1px solid ${C.line}` }}>
+                  <div className="grid place-items-center rounded-lg shrink-0" style={{ width: 38, height: 38, background: due ? C.amberBg : C.bg }}>
+                    <CalendarClock size={17} style={{ color: due ? C.amber : C.muted }} />
+                  </div>
+                  <button onClick={() => openLead(l.id)} className="min-w-0 flex-1 text-left">
+                    <div className="text-sm font-semibold" style={{ color: C.text }}>{l.name}</div>
+                    <div className="text-xs" style={{ color: C.muted }}>{l.phone}</div>
+                  </button>
+                  <div className="text-right">
+                    <div className="text-xs font-semibold" style={{ color: due ? C.amber : C.text }}>{l.nextFollowUp}</div>
+                    <div className="mt-0.5"><Badge status={l.status} /></div>
+                  </div>
+                </div>
+              );
+            })}
+            {withFollow.length === 0 && <p className="text-sm text-center py-10" style={{ color: C.faint }}>No follow-ups scheduled.</p>}
+          </div>
+        </Card>
+        <Card pad={false}>
+          <div className="px-5 py-3" style={{ borderBottom: `1px solid ${C.line}` }}><h3 className="font-semibold text-sm" style={{ color: C.text }}>This week</h3></div>
+          <div className="p-3 space-y-1.5">
+            {days.map((d) => {
+              const c = withFollow.filter((l) => l.nextFollowUp === d).length;
+              return (
+                <div key={d} className="flex items-center justify-between rounded-lg px-3 py-2" style={{ background: d === today ? C.goldSoft : C.bg }}>
+                  <span className="text-sm" style={{ color: C.text, fontWeight: d === today ? 600 : 400 }}>{d}{d === today ? " · today" : ""}</span>
+                  <span className="text-xs font-semibold rounded-full px-2 py-0.5" style={{ background: c ? C.ink : "transparent", color: c ? "#fff" : C.faint }}>{c || "—"}</span>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   CATALOG & EMAIL PLACEHOLDER
+   ============================================================ */
+function CatalogPanel({ requireApproval, setRequireApproval, onSend }) {
+  const items = [
+    ["Catalog", "Full wholesale line sheet with pricing", FileText],
+    ["Price list", "Wholesale prices with retail margins", DollarSign],
+    ["Intro email", "First-touch introduction to Jewelar", Mail],
+    ["Follow-up email", "Re-engage a lead who went quiet", Send],
+    ["SMS link", "Text a link to the catalog", MessageSquare],
+  ];
+  return (
+    <div>
+      <SectionTitle title="Catalog & Email" sub="Send materials to leads — placeholder, no real sending yet" />
+      <div className="rounded-xl p-3.5 mb-5 flex items-center justify-between gap-3 flex-wrap" style={{ background: C.card, border: `1px solid ${C.line}` }}>
+        <div className="flex items-center gap-2.5">
+          <ShieldCheck size={18} style={{ color: C.gold }} />
+          <div><div className="text-sm font-semibold" style={{ color: C.text }}>Require my approval before sending</div><div className="text-xs" style={{ color: C.muted }}>Nothing goes out until you confirm</div></div>
+        </div>
+        <Toggle on={requireApproval} onChange={setRequireApproval} />
+      </div>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {items.map(([t, sub, Icon]) => (
+          <Card key={t}>
+            <div className="grid place-items-center rounded-xl mb-3" style={{ width: 44, height: 44, background: C.goldSoft }}><Icon size={20} style={{ color: C.gold }} /></div>
+            <div className="font-semibold" style={{ color: C.text }}>{t}</div>
+            <p className="text-sm mt-1 mb-4" style={{ color: C.muted }}>{sub}</p>
+            <Btn variant="ghost" size="sm" icon={Send} onClick={() => onSend(t)}>Send {t.toLowerCase()}</Btn>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   REPORTS
+   ============================================================ */
+function Bar({ label, value, max, color }) {
+  return (
+    <div className="mb-3">
+      <div className="flex justify-between text-xs mb-1"><span style={{ color: C.text, fontWeight: 500 }}>{label}</span><span style={{ color: C.muted }}>{value}</span></div>
+      <div className="rounded-full overflow-hidden" style={{ height: 8, background: C.bg }}><div className="h-full rounded-full" style={{ width: `${(value / max) * 100}%`, background: color }} /></div>
+    </div>
+  );
+}
+function ReportsPage({ leads, calls }) {
+  const byStatus = {};
+  calls.forEach((c) => (byStatus[c.outcome] = (byStatus[c.outcome] || 0) + 1));
+  const maxStatus = Math.max(...Object.values(byStatus), 1);
+  const answered = calls.filter((c) => !["No answer", "Busy", "Voicemail", "Call failed"].includes(c.outcome)).length;
+  const metrics = [
+    { label: "Answer rate", value: Math.round((answered / calls.length) * 100) + "%", icon: PhoneIncoming, tone: "blue" },
+    { label: "Interest rate", value: Math.round((leads.filter((l) => l.status === "Interested").length / leads.length) * 100) + "%", icon: ThumbsUp, tone: "green" },
+    { label: "Catalog request rate", value: Math.round((leads.filter((l) => l.catalog !== "—").length / leads.length) * 100) + "%", icon: FileText, tone: "gold" },
+    { label: "Callback rate", value: Math.round((leads.filter((l) => l.status === "Wants callback").length / leads.length) * 100) + "%", icon: Clock, tone: "amber" },
+    { label: "Do Not Call", value: leads.filter((l) => l.dnc).length, icon: PhoneOff, tone: "red" },
+    { label: "Follow-ups due today", value: leads.filter((l) => l.nextFollowUp === "2026-06-24").length, icon: CalendarClock, tone: "ink" },
+  ];
+  const tones = { green: C.green, red: C.red, amber: C.amber, blue: C.blue, gold: C.gold, ink: C.ink };
+  return (
+    <div>
+      <SectionTitle title="Reports" sub="Outreach performance overview" />
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-5">
+        {metrics.map((m) => <StatCard key={m.label} {...m} />)}
+      </div>
+      <div className="grid lg:grid-cols-2 gap-5">
+        <Card>
+          <h3 className="font-semibold mb-4" style={{ color: C.text }}>Calls by status</h3>
+          {Object.entries(byStatus).sort((a, b) => b[1] - a[1]).map(([s, v]) => (
+            <Bar key={s} label={s} value={v} max={maxStatus} color={tones[STATUS_TONE[s]] || C.slate} />
+          ))}
+        </Card>
+        <Card>
+          <h3 className="font-semibold mb-4" style={{ color: C.text }}>Best performing script</h3>
+          <div className="rounded-xl p-4 mb-3" style={{ background: C.goldSoft, border: `1px solid ${C.goldLine}` }}>
+            <div className="flex items-center justify-between"><span className="font-semibold" style={{ color: C.ink }}>Standard Wholesale Intro v3</span><Star size={16} fill={C.gold} style={{ color: C.gold }} /></div>
+            <div className="flex gap-4 mt-2 text-xs" style={{ color: C.muted }}>
+              <span>Answer <b style={{ color: C.text }}>41%</b></span><span>Interest <b style={{ color: C.text }}>27%</b></span><span>Catalog <b style={{ color: C.text }}>19%</b></span>
+            </div>
+          </div>
+          <Bar label="v3 interest rate" value={27} max={30} color={C.green} />
+          <Bar label="v2 interest rate" value={22} max={30} color={C.slate} />
+          <Bar label="v1 interest rate" value={18} max={30} color={C.slate} />
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   SETTINGS
+   ============================================================ */
+function SettingsPage() {
+  const groups = [
+    ["Company", [["Company name", "Jewelar"], ["Agent name", "Ava"], ["Website", "jewelar.co"], ["Catalog link", "jewelar.co/wholesale"]]],
+    ["Defaults", [["Default script", "Standard Wholesale Intro v3"], ["Default calling hours", "9:00 AM – 6:00 PM ET"], ["Test phone number", "(305) 555-0000"]]],
+    ["Integrations (placeholder)", [["Twilio account SID", "AC•••••••• (not connected)"], ["Twilio caller ID", "(305) 555-0100"], ["Google Maps API key", "•••••••• (not connected)"]]],
+  ];
+  return (
+    <div>
+      <SectionTitle title="Settings" sub="Company profile and integration placeholders" />
+      <div className="grid lg:grid-cols-3 gap-5">
+        <div className="lg:col-span-2 space-y-5">
+          {groups.map(([title, fields]) => (
+            <Card key={title}>
+              <h3 className="font-semibold mb-4" style={{ color: C.text }}>{title}</h3>
+              <div className="grid sm:grid-cols-2 gap-4">
+                {fields.map(([label, val]) => (
+                  <Field key={label} label={label}><input defaultValue={val} className={inputCls} style={inputStyle} /></Field>
+                ))}
+              </div>
+            </Card>
+          ))}
+          <Card>
+            <h3 className="font-semibold mb-3" style={{ color: C.text }}>Email signature</h3>
+            <textarea rows={4} defaultValue={"Stav\nJewelar — Wholesale Gold-Plated Jewelry\njewelar.co · wholesale@jewelar.co"} className={inputCls} style={inputStyle} />
+          </Card>
+          <Btn variant="gold" icon={Save}>Save settings</Btn>
+        </div>
+        <Card>
+          <h3 className="font-semibold mb-3" style={{ color: C.text }}>Connection status</h3>
+          {[["Twilio (AI calling)", false], ["Google Maps (search)", false], ["Email / SMS sending", false]].map(([s, on]) => (
+            <div key={s} className="flex items-center justify-between py-2.5" style={{ borderBottom: `1px solid ${C.line}` }}>
+              <span className="text-sm" style={{ color: C.text }}>{s}</span>
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-full px-2.5 py-1" style={{ background: C.slateBg, color: C.slate }}><CircleDot size={11} /> Placeholder</span>
+            </div>
+          ))}
+          <p className="text-xs mt-3" style={{ color: C.faint }}>Integrations are mocked. No live Twilio, Maps, email, or SMS is connected.</p>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   TOAST
+   ============================================================ */
+function Toast({ msg }) {
+  if (!msg) return null;
+  return (
+    <div className="fixed bottom-5 left-1/2 -translate-x-1/2 rounded-xl px-4 py-2.5 text-sm font-medium flex items-center gap-2 shadow-lg"
+      style={{ zIndex: 60, background: C.ink, color: "#fff" }}>
+      <CheckCircle2 size={16} style={{ color: C.gold }} /> {msg}
+    </div>
+  );
+}
+
+/* ============================================================
+   ROOT APP  — state + placeholder functions + router
+   ============================================================ */
+function App() {
+  const [view, setView] = useState("dashboard");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [leads, setLeads] = useState(MOCK_LEADS);
+  const [calls, setCalls] = useState(MOCK_CALLS);
+  const [tests, setTests] = useState(MOCK_TEST_CALLS);
+  const [script, setScript] = useState(buildDefaultScript());
+  const [versions, setVersions] = useState(MOCK_SCRIPT_VERSIONS);
+  const [openLeadId, setOpenLeadId] = useState(null);
+  const [callLeadId, setCallLeadId] = useState(null);
+  const [toast, setToast] = useState("");
+  const [requireApproval, setRequireApproval] = useState(true);
+  const [compChecks, setCompChecks] = useState(COMPLIANCE_ITEMS.map(() => false));
+  const [compSettings, setCompSettings] = useState({ aiDisc: true, recDisc: true, approval: true, autostop: true });
+
+  const compliancePassed = compChecks.every(Boolean);
+  const flash = (m) => { setToast(m); setTimeout(() => setToast(""), 2600); };
+  const openLead = (id) => setOpenLeadId(id);
+  const activeLead = leads.find((l) => l.id === openLeadId) || null;
+  const callLead = leads.find((l) => l.id === callLeadId) || null;
+
+  /* ---- placeholder functions (as specified) ---- */
+  const updateLeadStatus = (id, patch) => {
+    if (id === "__add__") { flash("Add-lead form is a placeholder in this demo"); return; }
+    setLeads((ls) => ls.map((l) => (l.id === id ? { ...l, ...patch } : l)));
+    flash("Lead updated");
+  };
+  const startTwilioAICall = (lead) => { setCallLeadId(lead.id); setView("calling"); setOpenLeadId(null); };
+  const saveCallLog = (lead, outcome, notes) => {
+    const newCall = { id: Date.now(), leadId: lead.id, store: lead.name, phone: lead.phone, datetime: "2026-06-24 now", duration: "3:40", outcome, objections: "—", summary: "Call completed via AI agent.", nextFollowUp: "2026-06-27", notes, mode: "AI" };
+    setCalls((cs) => [newCall, ...cs]);
+    setLeads((ls) => ls.map((l) => (l.id === lead.id ? { ...l, status: outcome, lastCall: "2026-06-24", dnc: outcome === "Do not call" ? true : l.dnc } : l)));
+    flash("Call log saved");
+    setView("history");
+  };
+  const sendCatalogEmail = (lead, kind) => flash(requireApproval ? `${kind} queued — awaiting your approval` : `${kind} sent (placeholder)`);
+  const sendSMS = (kind) => flash(`${kind} is a placeholder — no real sending`);
+  const saveScriptVersion = (action) => {
+    if (action === "save") { const nv = versions[0].v + 1; setVersions([{ v: nv, date: "2026-06-24", editedBy: "Stav", answer: "—", interest: "—", note: "Current" }, ...versions.map((x) => ({ ...x, note: x.note === "Current" ? "Previous" : x.note }))]); flash(`Saved as version ${nv}`); }
+    else if (action === "duplicate") flash("Script duplicated");
+    else if (action === "restore") { setScript(buildDefaultScript()); flash("Restored previous version"); }
+  };
+  const addLeadToCRM = (r) => {
+    setLeads((ls) => [...ls, { id: Date.now(), name: r.name, phone: r.phone, email: "", website: r.website, address: r.address, rating: r.rating, source: "Google Maps", status: "New", lastCall: "", nextFollowUp: "", score: 60, dnc: false, catalog: "—", notes: "" }]);
+    flash(`${r.name} added to CRM`);
+  };
+
+  const addedNames = leads.map((l) => l.name);
+
+  return (
+    <div className="min-h-screen flex" style={{ background: C.bg, fontFamily: SANS, color: C.text }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap');
+        *{box-sizing:border-box} body{margin:0} ::-webkit-scrollbar{width:8px;height:8px} ::-webkit-scrollbar-thumb{background:#ddd6c9;border-radius:4px}`}</style>
+
+      <Sidebar view={view} setView={setView} open={sidebarOpen} setOpen={setSidebarOpen} />
+
+      <div className="flex-1 min-w-0 flex flex-col">
+        <Topbar onMenu={() => setSidebarOpen(true)} onTest={() => setView("test")} />
+        <main className="flex-1 p-4 lg:p-7 w-full mx-auto" style={{ maxWidth: 1400 }}>
+          {view === "dashboard" && <Dashboard leads={leads} calls={calls} setView={setView} openLead={openLead} />}
+          {view === "leads" && <LeadTable leads={leads} openLead={openLead} onCall={startTwilioAICall} onUpdate={updateLeadStatus} />}
+          {view === "map" && <MapSearch onAdd={addLeadToCRM} addedNames={addedNames} />}
+          {view === "scripts" && <ScriptEditor script={script} setScript={setScript} versions={versions} onSaveVersion={saveScriptVersion} />}
+          {view === "calling" && <CallingPanel lead={callLead} leads={leads} onPickLead={setCallLeadId} onComplete={saveCallLog} compliancePassed={compliancePassed} />}
+          {view === "history" && <CallHistory calls={calls} openLead={openLead} />}
+          {view === "followups" && <FollowUpPanel leads={leads} openLead={openLead} onUpdate={updateLeadStatus} />}
+          {view === "catalog" && <CatalogPanel requireApproval={requireApproval} setRequireApproval={setRequireApproval} onSend={sendSMS} />}
+          {view === "compliance" && <ComplianceChecklist checks={compChecks} setChecks={setCompChecks} settings={compSettings} setSettings={setCompSettings} passed={compliancePassed} />}
+          {view === "reports" && <ReportsPage leads={leads} calls={calls} />}
+          {view === "settings" && <SettingsPage />}
+          {view === "test" && <TestCallPage tests={tests} setTests={setTests} />}
+        </main>
+      </div>
+
+      <LeadDetails lead={activeLead} calls={calls} onClose={() => setOpenLeadId(null)} onCall={startTwilioAICall} onUpdate={updateLeadStatus} onCatalog={sendCatalogEmail} />
+      <Toast msg={toast} />
+    </div>
+  );
+}
+
+createRoot(document.getElementById("root")).render(<App />);
+
+</script>
+</body>
+</html>
